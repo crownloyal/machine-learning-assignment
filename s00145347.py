@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.6
 # -*- coding: utf-8 -*-
 
 """
@@ -7,18 +7,19 @@ Created on Sat Nov 30 11:58:04 2019
 """
 
 import io
+import itertools
 import os
 
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib import style
-import numpy as np
-import itertools
-import pandas as pd
 from pandas.plotting import scatter_matrix
 from sklearn import linear_model, preprocessing, svm
 from sklearn.cluster import KMeans
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (accuracy_score, classification_report,
                              confusion_matrix, mean_squared_error)
@@ -27,8 +28,7 @@ from sklearn.model_selection import (StratifiedKFold, cross_val_score,
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from tabulate import tabulate
 from ttictoc import TicToc
 
@@ -40,6 +40,8 @@ Your Name and Your student ID:
 # Dominic M Brause
 # R00145347
 """
+
+# This code requires python 3.6 or greater
 
 THIS_FOLDER = os.path.dirname(os.path.abspath(__file__))
 file = os.path.join(THIS_FOLDER, "data", "bank.csv")
@@ -134,6 +136,7 @@ def task2(file_path):
     timer.toc()
     print(f"Render time for all data points: {timer.elapsed}s ({seconds_to_minutes(timer.elapsed)}min)")
 
+    # plotting centroids
     plt.scatter(
         center[:,0], 
         center[:,1], 
@@ -143,9 +146,9 @@ def task2(file_path):
     plt.show()
 
 def task3(file_path):
-    binning3 = preprocessing.KBinsDiscretizer(n_bins = 3)
-    binning6 = preprocessing.KBinsDiscretizer(n_bins = 6)
-    binning9 = preprocessing.KBinsDiscretizer(n_bins = 9)
+    binning3 = DecisionTreeRegressor(max_depth = 3)
+    binning6 = DecisionTreeRegressor(max_depth = 6)
+    binning9 = DecisionTreeRegressor(max_depth = 9)
 
     data = pd.read_csv(
         file_path,
@@ -167,27 +170,26 @@ def task3(file_path):
     Y_data = (data["bank_arg1"])
 
     # Training/testing sets 
-    X_train = X_data[:-2500] 
-    X_test = X_data[-2500:] 
-    Y_train = Y_data[:-2500] 
-    Y_test = Y_data[-2500:] 
+    X_train = X_data[:-10000] 
+    X_test = X_data[-10000:] 
+    Y_train = Y_data[:-10000] 
+    Y_test = Y_data[-10000:] 
 
     timer.tic()
-    binning3.fit(X_data)
-    prediction3 = binning3.transform(X_data)
+    binning3.fit(X_train, Y_train)
+    prediction3 = binning3.predict(X_test)
     timer.toc()
 
     timer.tic()
-    binning6.fit(X_data)
-    prediction6 = binning6.transform(X_data)
+    binning6.fit(X_train, Y_train)
+    prediction6 = binning6.predict(X_test)
     timer.toc()
 
     timer.tic()
-    binning9.fit(X_data)
-    prediction9 = binning9.transform(X_data)    
+    binning9.fit(X_train, Y_train)
+    prediction9 = binning9.predict(X_test)
     timer.toc()
 
-    # TODO: Fix evaluation for matrix
     acc3 = evaluate_result(prediction3, Y_data.values)
     acc6 = evaluate_result(prediction6, Y_data.values)
     acc9 = evaluate_result(prediction9, Y_data.values)
@@ -220,10 +222,10 @@ def task4(file_path):
     Y_data = (data["y"])
 
     # Training/testing sets 
-    X_train = X_data[:-10000] 
-    X_test = X_data[-10000:] 
-    Y_train = Y_data[:-10000] 
-    Y_test = Y_data[-10000:] 
+    X_train = X_data[:-50] 
+    X_test = X_data[-50:] 
+    Y_train = Y_data[:-50] 
+    Y_test = Y_data[-50:] 
 
     kneighbors = KNeighborsClassifier()
     dec_tree = DecisionTreeClassifier()
@@ -261,7 +263,30 @@ def task4(file_path):
     timer.toc()
     print(f"RandomForestClassifier: {evaluate_result(prediction_for, Y_test.values)}% matched in {timer.elapsed}s")
 
-    # TODO: Explain difference in algorithms
+    # First run, 10000 test samples -
+    # KNeighborsClassifier: 70.05% matched in 0.6169149875640869s
+    # DecisionTreeClassifier: 70.06% matched in 0.06008481979370117s
+    # GaussianNB: 70.86% matched in 0.016302108764648438s
+    # svm.SVC: 70.87% matched in 9.52125597000122s
+    # RandomForestClassifier: 70.09% matched in 3.0073578357696533s 
+
+    # Second attempt 1000 test samples -
+    # KNeighborsClassifier: 51.2% matched in 0.18589377403259277s
+    # DecisionTreeClassifier: 52.2% matched in 0.07429885864257812s
+    # GaussianNB: 50.5% matched in 0.01893901824951172s
+    # svm.SVC: 51.1% matched in 15.437480926513672s
+    # RandomForestClassifier: 52.300000000000004% matched in 2.6012468338012695s
+
+    # Third run 50 test samples -
+    # KNeighborsClassifier: 50.0% matched in 0.17971301078796387s
+    # DecisionTreeClassifier: 52.0% matched in 0.08037710189819336s
+    # GaussianNB: 50.0% matched in 0.01857304573059082s
+    # svm.SVC: 44.0% matched in 24.05176091194153s
+    # RandomForestClassifier: 54.0% matched in 3.6611649990081787s
+
+    # Conclusion: Tree-based algorithms perform best with smaller data sets, 
+    # however the field is generally quite close and I would unironically bin them into
+    # the same group. Run time increases with less data
 
 def task5(file_path):
     data = pd.read_csv(
@@ -329,18 +354,18 @@ def task6(file_path):
     Y_data = (data["y"])
 
     # Training/testing sets 
-    X_train = X_data[:-10000] 
-    X_test = X_data[-10000:] 
-    Y_train = Y_data[:-10000] 
-    Y_test = Y_data[-10000:] 
+    X_train = X_data[:-35000] 
+    X_test = X_data[-35000:] 
+    Y_train = Y_data[:-35000] 
+    Y_test = Y_data[-35000:] 
 
     A_train = X_data[:-10] 
     A_test = X_data[-10:] 
     B_train = Y_data[:-10] 
     B_test = Y_data[-10:] 
 
-    dec_tree = DecisionTreeClassifier()
-    dec_tree_underfit = DecisionTreeClassifier()
+    dec_tree = DecisionTreeClassifier(criterion = 'entropy', max_depth = 8)
+    dec_tree_underfit = DecisionTreeClassifier(criterion = 'entropy', max_depth = 8)
 
     timer.tic()
     dec_tree.fit(X_train, Y_train)
@@ -354,7 +379,13 @@ def task6(file_path):
     timer.toc()
     print(f"DecisionTreeClassifier-Underfit: {evaluate_result(prediction_underfit, B_test.values)}% matched in {timer.elapsed}s")
 
-    # TODO: Explain over-fitting a data set
+    # Underfitting refers to not delivering enough data to 
+    # approximate a function which matches the data set. In our case, a test set of 10 items can
+    # will only return 20% accuracy. Interestingly, a set of 5 row will increase accuracy to 40%.
+    # 
+    # Overfitting refers to passing in too much noise and ineffective data, so the resulting
+    # function returns incorrect results when challenged with real-world data.
+    # I was not able to demonstrate overfitting effectively.
 
 def task7(file_path):
     data = pd.read_csv(
